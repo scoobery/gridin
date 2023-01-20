@@ -22,6 +22,7 @@ Grid :: struct(T: typeid)
     using pf_interface:     Pathfinding_Vtable(T),
     using vis_interface:    Visibility_Vtable(T),
     data:                   []T,
+    userflags:              bit_set[0..<64],
 }
 
 /*
