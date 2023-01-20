@@ -103,7 +103,7 @@ reverse_index :: proc(g: Grid_Dims, idx: int) -> (x,y: int)
     Checks if X,Y coordinates are within the grid's dimensions.
 */
 in_bounds :: proc(g: Grid_Dims, x,y: int) -> bool
-{ return x > 0 && x < g.width && y > 0 && y < g.height }
+{ return x >= 0 && x < g.width && y >= 0 && y < g.height }
 
 /*
     Gets the value of the grid node at X,Y.
