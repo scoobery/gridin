@@ -7,8 +7,10 @@ Grid_Dims :: struct
 
 Pathfinding_Vtable :: struct(T: typeid)
 {
-    neighbors:      proc(g: ^Grid(T), x,y: int) -> []struct{idx: int, cost: f32},
+    neighbors:      proc(g: ^Grid(T), x,y: int) -> []Neighbor,
     path_distance:  proc(g: ^Grid(T), x1,y1,x2,y2: int) -> f32,
+    admissible:     proc(g: ^Grid(T), x,y: int) -> bool,
+    cost_modifier:  proc(g: ^Grid(T), x,y: int) -> f32,
 }
 
 Visibility_Vtable :: struct(T: typeid)
@@ -39,17 +41,20 @@ init :: proc(g: ^Grid($T), width,height: int)
 /*
     Initializes the grid and sets up a virtual interface for pathfinding functions.
 
-    neighbors       : Function pointer to your function which returns an point's neighbors as an array of array indices with associated floating-point costs.
-    path_distance   : Function pointer to your function which returns the distance cost between two points as a float.
+    neighbors       : Your function which returns an point's neighbors as an array of array indices with associated floating-point costs.
+    path_distance   : Your function which returns the distance cost between two points as a float.
+    cost_modifier   : Your function which calculates and returns the cost of moving through the coordinate at X,Y.
 */
 init_with_pathfinding :: proc(
     g: ^Grid($T), 
     width,height: int, 
-    neighbors: proc(g: ^Grid(T), x,y: int) -> []struct{idx: int, cost: f32}, 
-    path_distance: proc(g: ^Grid(T), x1,y1,x2,y2: int) -> f32)
+    neighbors: proc(g: ^Grid(T), x,y: int) -> []Neighbor, 
+    path_distance: proc(g: ^Grid(T), x1,y1,x2,y2: int) -> f32,
+    admissible: proc(g: ^Grid(T), x,y: int) -> bool,
+    cost_modifier:  proc(g: ^Grid(T), x,y: int) -> f32)
 { 
     init(g, width, height)
-    g.pf_interface = {neighbors, path_distance}
+    g.pf_interface = {neighbors, path_distance, admissible, cost_modifier}
 }
 
 /*
@@ -72,12 +77,14 @@ init_with_visibility :: proc(
 init_all_interfaces :: proc(
     g: ^Grid($T), 
     width,height: int, 
-    neighbors: proc(g: ^Grid(T), x,y: int) -> []struct{idx: int, cost: f32}, 
+    neighbors: proc(g: ^Grid(T), x,y: int) -> []Neighbor, 
     path_distance: proc(g: ^Grid(T), x1,y1,x2,y2: int) -> f32,
+    admissible: proc(g: ^Grid(T), x,y: int) -> bool,
+    cost_modifier:  proc(g: ^Grid(T), x,y: int) -> f32,
     is_opaque: proc(g: ^Grid(T), x,y: int) -> bool)
 {
     init(g, width, height)
-    g.pf_interface = {neighbors, path_distance}
+    g.pf_interface = {neighbors, path_distance, admissible, cost_modifier}
     g.vis_interface = {is_opaque}
 }
 
@@ -90,33 +97,38 @@ unload :: proc(g: ^Grid($T))
 /*
     Gets an array index in the grid from X,Y coordinates.
 */
-index :: proc(g: Grid_Dims, x,y: int) -> int
+index :: #force_inline proc(g: Grid_Dims, x,y: int) -> int
 { return (y * g.width) + x }
 
 /*
     Gets X,Y coordinates from an array index.
 */
-reverse_index :: proc(g: Grid_Dims, idx: int) -> (x,y: int)
+reverse_index :: #force_inline proc(g: Grid_Dims, idx: int) -> (x,y: int)
 {  x = idx % g.width; y = idx / g.width; return }
 
 /*
     Checks if X,Y coordinates are within the grid's dimensions.
 */
-in_bounds :: proc(g: Grid_Dims, x,y: int) -> bool
+in_bounds :: #force_inline proc(g: Grid_Dims, x,y: int) -> bool
 { return x >= 0 && x < g.width && y >= 0 && y < g.height }
 
 /*
     Gets the value of the grid node at X,Y.
 */
-get :: proc(g: ^Grid($T), x,y: int) -> T
+get :: #force_inline proc(g: ^Grid($T), x,y: int) -> T
 { return g.data[index(g,x,y)] }
 
 /*
     Sets the value a grid node at X,Y.
 */
-set :: proc(g: ^Grid($T), x,y: int, val: T)
+set :: #force_inline proc(g: ^Grid($T), x,y: int, val: T)
 { g.data[index(g,x,y)] = val }
 
+/*
+    Resets all of the values in the graph to T's default  value.
+*/
+reset :: #force_inline proc(g: ^Grid($T))
+{ for i in 0..<(g.dims.width * g.dims.height) do g.data[i] = T{} }
 
 
 Grid_Iterator :: struct(T: typeid)
