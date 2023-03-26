@@ -1,5 +1,5 @@
 # gridin
-A 2D grid library for Odin, with support for BYOA (Bring-Your-Own-Algorithm) pathfinding and visibility.
+A 2D grid library for Odin, with support for "Bring-Your-Own-Implementation" pathfinding and visibility.
 
 ### Quick-Start Guide:
 ***Coming soon!***
