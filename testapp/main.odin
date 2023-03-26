@@ -50,22 +50,28 @@ main :: proc()
     tiles:  grid.Grid(int)
     currentTile: grid.Point2D
     hoveredTile: grid.Point2D
+    lastCurrent: grid.Point2D = {-1,-1}
+    lastHovered: grid.Point2D = {-1,-1}
+
+    astar_path: []int
+    floodfill: []int
 
     rl.SetConfigFlags(rl.ConfigFlags{.WINDOW_RESIZABLE})
     rl.InitWindow(800, 450, "Pathfinding Test")
     defer rl.CloseWindow()
 
-    grid.init_with_pathfinding(&tiles, 10, 10, map_neighbors, map_path_distance, map_admissible, map_cost_mod)
-    grid.set(&tiles, 4, 4, -1)
-    grid.set(&tiles, 4, 5, -1)
-    grid.set(&tiles, 5, 4, -1)
-    grid.set(&tiles, 5, 5, -1)
+    grid.init_with_pathfinding(&tiles, 32, 12, map_neighbors, map_path_distance, map_admissible, map_cost_mod)
+    grid.set(&tiles, 8, 8, -1)
+    grid.set(&tiles, 9, 9, -1)
+    grid.set(&tiles, 9, 8, -1)
+    grid.set(&tiles, 8, 9, -1)
 
     for !rl.WindowShouldClose() {
         grid_pos := rl.GetMousePosition()
         grid_pos.x = grid_pos.x / GRID_SIZE
         grid_pos.y = grid_pos.y / GRID_SIZE
 
+        // Set the hovered/selected tile.
         if grid.in_bounds(&tiles, int(grid_pos.x), int(grid_pos.y)) {
             hoveredTile = {int(grid_pos.x), int(grid_pos.y)}
         }
@@ -73,12 +79,23 @@ main :: proc()
             currentTile = hoveredTile
         }
 
-        astar_path := grid.astar(&tiles, currentTile.x, currentTile.y, hoveredTile.x, hoveredTile.y)
+        // To save frames, don't recalculate the path/floodfill unless the hovered/selected tile has changed.
+        if currentTile != lastCurrent || hoveredTile != lastHovered {
+            // Since it's a locally copied slice, make sure it gets deleted first.
+            delete(floodfill)
+            delete(astar_path)
+            // Now copy the slice locally off of the temp allocator.
+            floodfill = slice.clone(grid.flood_fill(&tiles, currentTile.x, currentTile.y, 8))
+            astar_path = slice.clone(grid.astar(&tiles, currentTile.x, currentTile.y, hoveredTile.x, hoveredTile.y))
+            // Set the last hovered/selected tile.
+            lastCurrent = currentTile
+            lastHovered = hoveredTile
+        }
 
         rl.BeginDrawing()
             rl.ClearBackground(rl.DARKGRAY)
-            for y in 0..<tiles.dims.height {
-                for x in 0..<tiles.dims.height {
+            for y in 0..<tiles.height {
+                for x in 0..<tiles.width {
                     pos := grid.Point2D{x,y}
                     box_color := pos == currentTile ? rl.YELLOW : rl.BLACK
                     line_color := pos == hoveredTile ? rl.RED : rl.RAYWHITE
@@ -87,7 +104,16 @@ main :: proc()
                     rl.DrawText(rl.TextFormat("%d", grid.get(&tiles,x,y)), i32(x * GRID_SIZE) + 2, i32(y * GRID_SIZE) + 2, 20, rl.RAYWHITE)
                 }
             }
+            
+            // Draw all of the flood-filled tiles.
+            if len(floodfill) > 0 {
+                for idx in floodfill {
+                    x,y := grid.reverse_index(&tiles, idx)
+                    rl.DrawRectangle(i32(x * GRID_SIZE), i32(y * GRID_SIZE), GRID_SIZE, GRID_SIZE, {240,255,0,128})
+                }
+            }
 
+            // Draw all of the points in the A* path.
             if len(astar_path) > 0 {
                 for idx in astar_path {
                     x,y := grid.reverse_index(&tiles, idx)
@@ -95,7 +121,7 @@ main :: proc()
                 }
             }
 
-           rl.DrawFPS(2, 2)
+            rl.DrawFPS(2, 2)
         rl.EndDrawing()
 
         free_all(context.temp_allocator)
