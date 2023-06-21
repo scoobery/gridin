@@ -94,6 +94,8 @@ flood_fill :: proc(g: ^Grid($T), from_x,from_y: int, dist: f32, include_costs :=
     q.push_front(&area, start)
 
     dfill := make_map(map[int]int, 1, context.temp_allocator)
+    dists := make_map(map[int]f32, 1, context.temp_allocator)
+    dists[start] = 0
 
     for q.len(area) > 0 {
         current := q.pop_front(&area)
@@ -101,8 +103,12 @@ flood_fill :: proc(g: ^Grid($T), from_x,from_y: int, dist: f32, include_costs :=
         for n in g->neighbors(cx,cy) {
             if n.idx in dfill { continue }
             nx,ny := reverse_index(g, n.idx)
-            nd := g->path_distance(from_x,from_y,nx,ny)
-            if include_costs do nd += g->cost_modifier(nx,ny)
+            if !g->admissible(nx,ny) { continue }
+            nd := g->path_distance(cx,cy,nx,ny) + dists[current]
+            if include_costs {
+                nd += g->cost_modifier(nx,ny)
+            }
+            dists[n.idx] = nd
             switch {
             case nd < dist:
                 dfill[n.idx] = n.idx
